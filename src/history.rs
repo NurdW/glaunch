@@ -197,6 +197,7 @@ pub fn has_overrides(cli: &CliOverrides) -> bool {
         || cli.hdr.is_some()
         || cli.vrr.is_some()
         || cli.gamescope.is_some()
+        || cli.output.is_some()
         || cli.itm.is_some()
         || cli.fsr4.is_some()
         || cli.vcache.is_some()
@@ -220,6 +221,7 @@ pub fn build_profile_from_overrides(
         || overrides.hdr.is_some()
         || overrides.vrr.is_some()
         || overrides.gamescope.is_some()
+        || overrides.output.is_some()
         || overrides.itm.is_some()
         || overrides.fsr4.is_some()
         || overrides.vcache.is_some()
@@ -233,6 +235,7 @@ pub fn build_profile_from_overrides(
             hdr: overrides.hdr,
             vrr: overrides.vrr,
             gamescope: overrides.gamescope,
+            output: overrides.output.clone(),
             itm: overrides.itm,
             fsr4: overrides.fsr4,
             vcache: overrides.vcache,

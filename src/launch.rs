@@ -15,6 +15,7 @@ pub struct LaunchPlan {
 pub fn build_launch_plan(
     settings: &ResolvedSettings,
     vcache: Option<&VcacheInfo>,
+    display_index: Option<u32>,
     game_command: &[String],
 ) -> Result<LaunchPlan> {
     if game_command.is_empty() {
@@ -22,6 +23,8 @@ pub fn build_launch_plan(
     }
 
     let mut env_vars: Vec<(String, String)> = Vec::new();
+    // Accumulate LD_PRELOAD entries so multiple features can contribute
+    let mut ld_preload_entries: Vec<String> = Vec::new();
 
     if settings.fsr4 {
         env_vars.push(("PROTON_FSR4_RDNA3_UPGRADE".into(), "1".into()));
@@ -46,6 +49,9 @@ pub fn build_launch_plan(
 
     if settings.mangohud {
         env_vars.push(("MANGOHUD".into(), "1".into()));
+        // Preload the MangoHud shim so OpenGL games get the overlay too.
+        // $LIB is resolved by the dynamic linker to lib64 or lib at runtime.
+        ld_preload_entries.push("/usr/$LIB/mangohud/libMangoHud_shim.so".into());
         if let Some(config) = &settings.mangohud_config
             && !config.is_empty()
         {
@@ -62,12 +68,17 @@ pub fn build_launch_plan(
     }
 
     if settings.fix_mouse {
-        let gamemode_lib = "/usr/lib/libgamemodeauto.so.0";
-        let ld_preload = match std::env::var("LD_PRELOAD") {
-            Ok(existing) if !existing.is_empty() => format!("{gamemode_lib}:{existing}"),
-            _ => gamemode_lib.to_string(),
-        };
-        env_vars.push(("LD_PRELOAD".into(), ld_preload));
+        ld_preload_entries.push("/usr/lib/libgamemodeauto.so.0".into());
+    }
+
+    // Merge all LD_PRELOAD entries with any existing value from the environment
+    if !ld_preload_entries.is_empty() {
+        if let Ok(existing) = std::env::var("LD_PRELOAD")
+            && !existing.is_empty()
+        {
+            ld_preload_entries.push(existing);
+        }
+        env_vars.push(("LD_PRELOAD".into(), ld_preload_entries.join(":")));
     }
 
     let mut command: Vec<String> = Vec::new();
@@ -81,6 +92,10 @@ pub fn build_launch_plan(
         command.push("--fullscreen".into());
         command.extend(["-r".into(), settings.refresh_rate.to_string()]);
 
+        if let Some(idx) = display_index {
+            command.extend(["--display-index".into(), idx.to_string()]);
+        }
+
         if settings.vrr {
             command.push("--adaptive-sync".into());
         }
@@ -89,6 +104,9 @@ pub fn build_launch_plan(
         }
         if settings.itm {
             command.push("--hdr-itm-enable".into());
+        }
+        if settings.mangohud {
+            command.push("--mangoapp".into());
         }
 
         command.push("--".into());

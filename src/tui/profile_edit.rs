@@ -71,6 +71,10 @@ impl EditState {
                     label: "Gamescope".into(),
                     value: None,
                 },
+                Field::Text {
+                    label: "Output".into(),
+                    value: String::new(),
+                },
                 Field::Toggle {
                     label: "V-Cache".into(),
                     value: None,
@@ -161,6 +165,10 @@ impl EditState {
                     label: "Gamescope".into(),
                     value: s.and_then(|s| s.gamescope),
                 },
+                Field::Text {
+                    label: "Output".into(),
+                    value: s.and_then(|s| s.output.clone()).unwrap_or_default(),
+                },
                 Field::Toggle {
                     label: "V-Cache".into(),
                     value: s.and_then(|s| s.vcache),
@@ -215,6 +223,13 @@ impl EditState {
         let refresh_rate_str = field_val("Refresh Rate");
         let vkbasalt_profile = field_val("vkBasalt Profile");
 
+        let output_str = field_val("Output");
+        let output = if output_str.is_empty() {
+            None
+        } else {
+            Some(output_str)
+        };
+
         let settings = ProfileSettings {
             width: width_str.parse().ok(),
             height: height_str.parse().ok(),
@@ -222,6 +237,7 @@ impl EditState {
             hdr: field_opt_bool("HDR"),
             vrr: field_opt_bool("VRR"),
             gamescope: field_opt_bool("Gamescope"),
+            output,
             itm: field_opt_bool("ITM"),
             fsr4: field_opt_bool("FSR4"),
             vcache: field_opt_bool("V-Cache"),
@@ -233,6 +249,7 @@ impl EditState {
             || settings.hdr.is_some()
             || settings.vrr.is_some()
             || settings.gamescope.is_some()
+            || settings.output.is_some()
             || settings.itm.is_some()
             || settings.fsr4.is_some()
             || settings.vcache.is_some()

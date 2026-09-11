@@ -18,6 +18,7 @@ fn default_settings() -> ResolvedSettings {
         mangohud_config: None,
         vkbasalt: false,
         vkbasalt_profile: None,
+        output: None,
     }
 }
 
@@ -26,7 +27,7 @@ fn test_basic_gamescope_command() {
     let settings = default_settings();
     let game_cmd = vec!["wine".to_string(), "game.exe".to_string()];
 
-    let plan = build_launch_plan(&settings, None, &game_cmd).unwrap();
+    let plan = build_launch_plan(&settings, None, None, &game_cmd).unwrap();
 
     assert_eq!(plan.command[0], "gamemoderun");
     assert_eq!(plan.command[1], "gamescope");
@@ -43,6 +44,8 @@ fn test_basic_gamescope_command() {
     let separator_pos = plan.command.iter().position(|s| s == "--").unwrap();
     assert_eq!(plan.command[separator_pos + 1], "wine");
     assert_eq!(plan.command[separator_pos + 2], "game.exe");
+    // no --display-index without explicit output
+    assert!(!plan.command.contains(&"--display-index".to_string()));
 }
 
 #[test]
@@ -51,7 +54,7 @@ fn test_no_gamescope() {
     settings.gamescope = false;
 
     let game_cmd = vec!["wine".to_string(), "game.exe".to_string()];
-    let plan = build_launch_plan(&settings, None, &game_cmd).unwrap();
+    let plan = build_launch_plan(&settings, None, None, &game_cmd).unwrap();
 
     assert_eq!(plan.command[0], "gamemoderun");
     assert_eq!(plan.command[1], "wine");
@@ -65,7 +68,7 @@ fn test_hdr_disabled() {
     settings.hdr = false;
 
     let game_cmd = vec!["game".to_string()];
-    let plan = build_launch_plan(&settings, None, &game_cmd).unwrap();
+    let plan = build_launch_plan(&settings, None, None, &game_cmd).unwrap();
 
     assert!(!plan.command.contains(&"--hdr-enabled".to_string()));
 }
@@ -76,7 +79,7 @@ fn test_itm_adds_flag() {
     settings.itm = true;
 
     let game_cmd = vec!["game".to_string()];
-    let plan = build_launch_plan(&settings, None, &game_cmd).unwrap();
+    let plan = build_launch_plan(&settings, None, None, &game_cmd).unwrap();
 
     assert!(plan.command.contains(&"--hdr-itm-enable".to_string()));
 }
@@ -87,7 +90,7 @@ fn test_fsr4_env_var() {
     settings.fsr4 = true;
 
     let game_cmd = vec!["game".to_string()];
-    let plan = build_launch_plan(&settings, None, &game_cmd).unwrap();
+    let plan = build_launch_plan(&settings, None, None, &game_cmd).unwrap();
 
     assert!(
         plan.env_vars
@@ -102,7 +105,7 @@ fn test_vkbasalt_env_vars() {
     settings.vkbasalt_profile = Some("reshade-film".to_string());
 
     let game_cmd = vec!["game".to_string()];
-    let plan = build_launch_plan(&settings, None, &game_cmd).unwrap();
+    let plan = build_launch_plan(&settings, None, None, &game_cmd).unwrap();
 
     assert!(
         plan.env_vars
@@ -124,7 +127,7 @@ fn test_mangohud_env_vars() {
     settings.mangohud_config = Some("fps-only".to_string());
 
     let game_cmd = vec!["game".to_string()];
-    let plan = build_launch_plan(&settings, None, &game_cmd).unwrap();
+    let plan = build_launch_plan(&settings, None, None, &game_cmd).unwrap();
 
     assert!(
         plan.env_vars
@@ -145,7 +148,7 @@ fn test_fix_mouse_ld_preload() {
     settings.fix_mouse = true;
 
     let game_cmd = vec!["game".to_string()];
-    let plan = build_launch_plan(&settings, None, &game_cmd).unwrap();
+    let plan = build_launch_plan(&settings, None, None, &game_cmd).unwrap();
 
     assert!(plan.env_vars.contains(&(
         "LD_PRELOAD".to_string(),
@@ -162,12 +165,41 @@ fn test_vcache_pinning_wraps_command() {
     };
 
     let game_cmd = vec!["game".to_string()];
-    let plan = build_launch_plan(&settings, Some(&vcache), &game_cmd).unwrap();
+    let plan = build_launch_plan(&settings, Some(&vcache), None, &game_cmd).unwrap();
 
     assert_eq!(plan.command[0], "systemd-run");
     assert!(plan.command.contains(&"--user".to_string()));
     assert!(plan.command.contains(&"--scope".to_string()));
     assert!(plan.command.contains(&"AllowedCPUs=0-7".to_string()));
+}
+
+#[test]
+fn test_display_index_added_when_present() {
+    let settings = default_settings();
+    let game_cmd = vec!["game".to_string()];
+    let plan = build_launch_plan(&settings, None, Some(2), &game_cmd).unwrap();
+
+    let idx_pos = plan
+        .command
+        .iter()
+        .position(|s| s == "--display-index")
+        .expect("--display-index should be present");
+    assert_eq!(plan.command[idx_pos + 1], "2");
+
+    // --display-index should come before the -- separator
+    let separator_pos = plan.command.iter().position(|s| s == "--").unwrap();
+    assert!(idx_pos < separator_pos);
+}
+
+#[test]
+fn test_display_index_not_added_without_gamescope() {
+    let mut settings = default_settings();
+    settings.gamescope = false;
+
+    let game_cmd = vec!["game".to_string()];
+    // Even if display_index is passed, it shouldn't appear without gamescope
+    let plan = build_launch_plan(&settings, None, Some(0), &game_cmd).unwrap();
+    assert!(!plan.command.contains(&"--display-index".to_string()));
 }
 
 #[test]
@@ -177,7 +209,7 @@ fn test_dry_run_output_format() {
     settings.gamescope = false;
 
     let game_cmd = vec!["wine".to_string(), "game.exe".to_string()];
-    let plan = build_launch_plan(&settings, None, &game_cmd).unwrap();
+    let plan = build_launch_plan(&settings, None, None, &game_cmd).unwrap();
 
     let output = glaunch::launch::dry_run_output(&plan);
     assert!(output.contains("PROTON_FSR4_RDNA3_UPGRADE=1"));

@@ -5,6 +5,7 @@ use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, Command};
 use glaunch::{config, hardware, history, launch};
+use hardware::resolve_wayland_display_index;
 
 fn main() {
     if let Err(e) = run() {
@@ -114,7 +115,38 @@ fn run() -> Result<()> {
                 None
             };
 
-            let plan = launch::build_launch_plan(&settings, vcache.as_ref(), &args.command)?;
+            // Resolve Wayland display index for --output / output config
+            let display_index = if settings.gamescope {
+                if let Some(ref connector) = settings.output {
+                    match resolve_wayland_display_index(connector) {
+                        Ok(Some(idx)) => {
+                            if args.verbose {
+                                eprintln!(
+                                    "glaunch: Resolved output {connector} → display index {idx}"
+                                );
+                            }
+                            Some(idx)
+                        }
+                        Ok(None) => {
+                            eprintln!(
+                                "glaunch: warning: output '{connector}' not found in Wayland outputs"
+                            );
+                            None
+                        }
+                        Err(e) => {
+                            eprintln!("glaunch: warning: failed to resolve output: {e}");
+                            None
+                        }
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let plan =
+                launch::build_launch_plan(&settings, vcache.as_ref(), display_index, &args.command)?;
 
             if args.dry_run {
                 println!("{}", launch::dry_run_output(&plan));
@@ -213,6 +245,7 @@ fn cli_overrides_from_run_args(args: &cli::RunArgs) -> config::CliOverrides {
         hdr: if args.no_hdr { Some(false) } else { None },
         vrr: if args.no_vrr { Some(false) } else { None },
         gamescope: if args.no_gamescope { Some(false) } else { None },
+        output: args.output.clone(),
         itm: if args.itm { Some(true) } else { None },
         fsr4: if args.fsr4 { Some(true) } else { None },
         vcache: if args.vcache {
@@ -295,5 +328,8 @@ fn log_settings(
     }
     if settings.vcache {
         eprintln!("glaunch: V-Cache pinning: requested");
+    }
+    if let Some(ref output) = settings.output {
+        eprintln!("glaunch: Output: {output}");
     }
 }

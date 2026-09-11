@@ -74,6 +74,10 @@ pub struct RunArgs {
     #[arg(short, long)]
     pub refresh_rate: Option<u32>,
 
+    /// Force gamescope to a specific monitor by connector name (e.g. DP-1)
+    #[arg(short = 'O', long)]
+    pub output: Option<String>,
+
     /// Enable MangoHud with optional config preset name
     #[arg(long, num_args = 0..=1, default_missing_value = "")]
     pub mangohud: Option<String>,

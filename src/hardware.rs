@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::config::config_dir;
@@ -34,6 +34,53 @@ struct HardwareCache {
     timestamp: u64,
     #[serde(flatten)]
     info: HardwareInfo,
+}
+
+/// Resolve a Wayland connector name (e.g. "DP-1") to its `wl_output` index.
+///
+/// Runs `wayland-info` and finds the position of the named output in the ordered
+/// list.  This index is what gamescope's `--display-index` expects in nested mode.
+/// Returns `None` if the connector isn't found or `wayland-info` isn't available.
+pub fn resolve_wayland_display_index(connector: &str) -> Result<Option<u32>> {
+    resolve_wayland_display_index_from_output(
+        &std::process::Command::new("wayland-info")
+            .output()
+            .context("failed to run wayland-info — is it installed?")?
+            .stdout,
+        connector,
+    )
+}
+
+/// Parse `wayland-info` stdout to find the index of a named connector.
+///
+/// `wayland-info` lists interfaces sequentially.  We track whether we're inside
+/// a `wl_output` block and only consider `name:` lines that belong to one.
+pub fn resolve_wayland_display_index_from_output(
+    stdout: &[u8],
+    connector: &str,
+) -> Result<Option<u32>> {
+    let text = String::from_utf8_lossy(stdout);
+    let mut index: u32 = 0;
+    let mut in_wl_output = false;
+
+    for line in text.lines() {
+        // Interface header lines start at column 0 (no leading whitespace).
+        if line.starts_with("interface: ") {
+            in_wl_output = line.contains("'wl_output'");
+            continue;
+        }
+        // Property lines inside a block are indented (tab or spaces).
+        if in_wl_output {
+            let trimmed = line.trim();
+            if let Some(name) = trimmed.strip_prefix("name: ") {
+                if name.trim() == connector {
+                    return Ok(Some(index));
+                }
+                index += 1;
+            }
+        }
+    }
+    Ok(None)
 }
 
 pub fn detect_vcache() -> Result<Option<VcacheInfo>> {

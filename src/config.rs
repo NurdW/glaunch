@@ -31,6 +31,8 @@ pub struct DefaultsConfig {
     pub hdr: Option<bool>,
     pub vrr: Option<bool>,
     pub gamescope: Option<bool>,
+    /// Wayland connector name for gamescope --display-index (e.g. "DP-1")
+    pub output: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -65,6 +67,8 @@ pub struct ProfileSettings {
     pub fsr4: Option<bool>,
     pub vcache: Option<bool>,
     pub fix_mouse: Option<bool>,
+    /// Wayland connector name for gamescope --display-index (e.g. "DP-1")
+    pub output: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -105,6 +109,8 @@ pub struct CliOverrides {
     pub vkbasalt: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vkbasalt_profile: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
 }
 
 // --- Fully resolved settings (no Options) ---
@@ -125,6 +131,8 @@ pub struct ResolvedSettings {
     pub mangohud_config: Option<String>,
     pub vkbasalt: bool,
     pub vkbasalt_profile: Option<String>,
+    /// Wayland connector name for gamescope --display-index (e.g. "DP-1")
+    pub output: Option<String>,
 }
 
 /// Resolve settings with layered precedence: CLI > profile > global > hardcoded
@@ -202,6 +210,10 @@ pub fn resolve_settings_from_layers(
         vkbasalt_profile: cli
             .and_then(|c| c.vkbasalt_profile.clone())
             .or_else(|| prof_vkbasalt.and_then(|v| v.profile.clone())),
+        output: cli
+            .and_then(|c| c.output.clone())
+            .or_else(|| prof_settings.and_then(|s| s.output.clone()))
+            .or_else(|| defaults.and_then(|d| d.output.clone())),
     }
 }
 
