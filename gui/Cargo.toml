@@ -1,0 +1,13 @@
+[package]
+name = "glaunch-gui"
+version = "0.1.0"
+edition = "2024"
+description = "Desktop GUI for building glaunch Steam launch commands and profiles"
+
+[dependencies]
+# eframe is the windowing layer for egui, an immediate-mode (redraw every frame) GUI toolkit
+eframe = "0.29"
+# Reuse glaunch's own config structs + file IO so the GUI can never write a profile
+# the real glaunch binary would fail to read.
+glaunch = { path = ".." }
+arboard = "3"

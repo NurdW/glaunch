@@ -1,3 +1,10 @@
+# Workspace: the CLI stays at the repo root (upstream layout untouched) and
+# the GUI lives in gui/ so upstream changes stay easy to pull.
+[workspace]
+members = ["gui"]
+# Plain `cargo build` in the repo root builds the CLI *and* the GUI.
+default-members = [".", "gui"]
+
 [package]
 name = "glaunch"
 version = "0.1.0"
